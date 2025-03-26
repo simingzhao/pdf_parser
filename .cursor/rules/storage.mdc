@@ -1,6 +1,7 @@
 ---
 description: Follow these rules when working on file storage.
 globs: 
+alwaysApply: false
 ---
 # Storage Rules
 

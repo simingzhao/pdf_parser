@@ -1,6 +1,7 @@
 ---
 description: Follow these rules when working with types.
 globs: 
+alwaysApply: false
 ---
 # Type Rules
 

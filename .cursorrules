@@ -6,18 +6,17 @@ Write the complete code for every step. Do not get lazy.
 
 Your goal is to completely finish whatever I ask for.
 
-You will see tags in the code. These are context tags that you should use to help you understand the codebase.
+You will see <ai_context> tags in the code. These are context tags that you should use to help you understand the codebase.
 
 ## Overview
 
-This is a web app template.
+A web application that allows users to upload PDF files, specify fields for extraction, and receive structured data output in JSON format with CSV export capability. The system focuses on parsing resumes and invoices for recruiters and businesses.
 
 ## Tech Stack
 
 - Frontend: Next.js, Tailwind, Shadcn, Framer Motion
 - Backend: Postgres, Supabase, Drizzle ORM, Server Actions
 - Auth: Clerk
-- Payments: Stripe
 - Deployment: Vercel
 
 ## Project Structure
@@ -89,6 +88,795 @@ And exporting it:
 export * from "./actions-types"
 ```
 
+### PDF Parsing Rules
+
+Use pdf2json as your pdf parsing package, it is a Node.js module that converts binary PDF files to structured JSON and extracts text content. Built on Mozilla's pdf.js, it's been adapted to run in Node.js rather than a browser environment, focusing specifically on text extraction and interactive form element parsing. The following are code examples:
+#### Basic PDF to JSON Conversion
+
+```javascript
+
+import fs from "fs";
+
+import { PDFParser } from "pdf2json";
+
+  
+
+const pdfParser = new PDFParser();
+
+  
+
+pdfParser.on("pdfParser_dataError", (errData) => {
+
+console.error(errData.parserError);
+
+});
+
+  
+
+pdfParser.on("pdfParser_dataReady", (pdfData) => {
+
+fs.writeFile(
+
+"./output.json",
+
+JSON.stringify(pdfData),
+
+() => console.log("Done.")
+
+);
+
+});
+
+pdfParser.loadPDF("./input.pdf");
+
+```
+
+#### Extracting Text Content Only
+
+```javascript
+
+import fs from "fs";
+
+import { PDFParser } from "pdf2json";
+
+  
+
+const pdfParser = new PDFParser();
+
+  
+
+pdfParser.on("pdfParser_dataError", (errData) => {
+
+console.error(errData.parserError);
+
+});
+
+  
+
+pdfParser.on("pdfParser_dataReady", () => {
+
+fs.writeFile(
+
+"./output.txt",
+
+pdfParser.getRawTextContent(),
+
+() => console.log("Text extraction complete")
+
+);
+
+});
+
+  
+
+pdfParser.loadPDF("./input.pdf");
+
+```
+
+#### Extracting Form Fields Only
+
+```javascript
+
+import fs from "fs";
+
+import { PDFParser } from "pdf2json";
+
+  
+
+const pdfParser = new PDFParser();
+
+  
+
+pdfParser.on("pdfParser_dataError", (errData) => {
+
+console.error(errData.parserError);
+
+});
+
+  
+
+pdfParser.on("pdfParser_dataReady", () => {
+
+fs.writeFile(
+
+"./fields.json",
+
+JSON.stringify(pdfParser.getAllFieldsTypes()),
+
+() => console.log("Form fields extraction complete")
+
+);
+
+});
+
+  
+
+pdfParser.loadPDF("./input.pdf");
+
+```
+
+#### Stream-Based Processing  
+
+```javascript
+
+import fs from "fs";
+
+import { PDFParser, StringifyStream } from "pdf2json";
+
+  
+
+const inputStream = fs.createReadStream("./input.pdf", {
+
+bufferSize: 64 * 1024
+
+});
+
+const outputStream = fs.createWriteStream("./output.json");
+
+  
+
+const pdfParser = new PDFParser();
+
+  
+
+inputStream
+
+.pipe(pdfParser.createParserStream())
+
+.pipe(new StringifyStream())
+
+.pipe(outputStream);
+
+```
+
+#### Using Page-Level Events
+
+```javascript
+
+import { PDFParser } from "pdf2json";
+
+  
+
+const pdfParser = new PDFParser();
+
+  
+
+// First event - metadata
+
+pdfParser.on("readable", (meta) => {
+
+console.log("PDF Metadata:", meta);
+
+});
+
+  
+
+// Page events - called for each page
+
+pdfParser.on("data", (page) => {
+
+if (page) {
+
+console.log(`Processing page ${page.Pages.length}`);
+
+// Process individual page
+
+} else {
+
+console.log("All pages processed");
+
+}
+
+});
+
+  
+
+// Error handling
+
+pdfParser.on("error", (err) => {
+
+console.error("Parser Error:", err);
+
+});
+
+  
+
+pdfParser.loadPDF("./input.pdf");
+
+```
+
+#### Pattern Library
+
+##### Basic Parsing Pattern
+
+```javascript
+
+import { PDFParser } from "pdf2json";
+
+  
+
+function parsePdf(filePath) {
+
+return new Promise((resolve, reject) => {
+
+const pdfParser = new PDFParser();
+
+pdfParser.on("pdfParser_dataError", (error) => reject(error));
+
+pdfParser.on("pdfParser_dataReady", (data) => resolve(data));
+
+pdfParser.loadPDF(filePath);
+
+});
+
+}
+
+  
+
+// Usage
+
+parsePdf("./document.pdf")
+
+.then(data => {
+
+// Process data
+
+})
+
+.catch(error => {
+
+// Handle error
+
+});
+
+```
+
+##### Multiple Output Formats Pattern
+
+```javascript
+
+import fs from "fs";
+
+import { PDFParser } from "pdf2json";
+
+  
+
+function extractAllFormats(inputPath, outputBasePath) {
+
+return new Promise((resolve, reject) => {
+
+const pdfParser = new PDFParser();
+
+pdfParser.on("pdfParser_dataError", (error) => reject(error));
+
+pdfParser.on("pdfParser_dataReady", (data) => {
+
+// Primary JSON output
+
+const primaryOutput = fs.writeFile(
+
+`${outputBasePath}.json`,
+
+JSON.stringify(data)
+
+);
+
+// Text content output
+
+const textOutput = fs.writeFile(
+
+`${outputBasePath}.txt`,
+
+pdfParser.getRawTextContent()
+
+);
+
+// Form fields output
+
+const fieldsOutput = fs.writeFile(
+
+`${outputBasePath}.fields.json`,
+
+JSON.stringify(pdfParser.getAllFieldsTypes())
+
+);
+
+Promise.all([primaryOutput, textOutput, fieldsOutput])
+
+.then(() => resolve(data))
+
+.catch(err => reject(err));
+
+});
+
+pdfParser.loadPDF(inputPath);
+
+});
+
+}
+
+```
+
+##### Form Field Processing Pattern
+
+```javascript
+
+import { PDFParser } from "pdf2json";
+
+  
+
+function processFormFields(filePath) {
+
+return new Promise((resolve, reject) => {
+
+const pdfParser = new PDFParser();
+
+pdfParser.on("pdfParser_dataError", (error) => reject(error));
+
+pdfParser.on("pdfParser_dataReady", () => {
+
+const fields = pdfParser.getAllFieldsTypes();
+
+// Process fields by type
+
+const processedFields = {
+
+textInputs: fields.filter(f => f.T?.Name === "alpha"),
+
+checkboxes: fields.filter(f => f.T?.Name === "box" && f.boxes?.length === 1),
+
+radioButtons: fields.filter(f => f.T?.Name === "box" && f.boxes?.length > 1),
+
+dropdowns: fields.filter(f => f.T?.Name === "alpha" && f.PL),
+
+signatures: fields.filter(f => f.T?.Name === "signature")
+
+};
+
+resolve(processedFields);
+
+});
+
+pdfParser.loadPDF(filePath);
+
+});
+
+}
+
+```
+
+##### Dictionary Access Helper
+
+```javascript
+
+import { PDFParser } from "pdf2json";
+
+  
+
+// Get reference to dictionaries
+
+const colorDict = PDFParser.colorDict;
+
+const fontFaceDict = PDFParser.fontFaceDict;
+
+const fontStyleDict = PDFParser.fontStyleDict;
+
+  
+
+// Helper to get color from index or hex
+
+function getColor(colorIndex) {
+
+if (colorIndex === -1 || colorIndex >= colorDict.length) {
+
+return null; // Will use 'oc' field for original color
+
+}
+
+return colorDict[colorIndex];
+
+}
+
+  
+
+// Helper to get font face
+
+function getFontFace(faceIndex) {
+
+if (faceIndex >= fontFaceDict.length) return fontFaceDict[0];
+
+return fontFaceDict[faceIndex];
+
+}
+
+  
+
+// Helper to get font style
+
+function getFontStyle(styleIndex) {
+
+if (styleIndex === -1) return null; // Will use 'TS' field
+
+if (styleIndex >= fontStyleDict.length) return fontStyleDict[0];
+
+return fontStyleDict[styleIndex];
+
+}
+
+```
+
+### OpenAI Model Rules
+
+#### Model Configuration
+
+- Always use the latest model: `gpt-4o-2024-11-20`
+
+- Utilize structured outputs when handling model responses in workflows to ensure consistent JSON schema adherence
+#### Setup and Initialization
+
+```javascript
+
+// Initialize with API key from environment variable
+
+import OpenAI from "openai";
+
+  
+
+const client = new OpenAI({
+
+apiKey: process.env.OPENAI_API_KEY, // automatically reads from environment
+
+});
+
+```
+
+#### Basic Usage Patterns
+
+##### Simple Text Generation
+
+```javascript
+
+// Generate plain text responses
+
+async function generateText() {
+
+const response = await client.responses.create({
+
+model: "gpt-4o-2024-11-20",
+
+input: "Explain quantum computing in simple terms."
+
+});
+
+// Access text using convenience property
+
+console.log(response.output_text);
+
+}
+
+```
+
+##### Using Instructions Parameter
+
+```javascript
+
+// Apply custom instructions to guide model behavior
+
+async function generateWithInstructions() {
+
+const response = await client.responses.create({
+
+model: "gpt-4o-2024-11-20",
+
+instructions: "Respond like a pirate captain.",
+
+input: "What's the weather like today?"
+
+});
+
+console.log(response.output_text);
+
+}
+
+```
+
+#### Advanced Implementation Patterns
+
+##### Prompt Template Manager
+
+```javascript
+
+class PromptTemplateManager {
+
+constructor() {
+
+this.templates = {};
+
+}
+
+  
+
+registerTemplate(name, template) {
+
+this.templates[name] = template;
+
+}
+
+  
+
+fillTemplate(templateName, variables) {
+
+const template = this.templates[templateName];
+
+if (!template) {
+
+throw new Error(`Template "${templateName}" not found`);
+
+}
+
+// Replace {{variable}} placeholders with values
+
+return template.replace(/\{\{(\w+)\}\}/g, (match, variable) => {
+
+return variables[variable] !== undefined ? variables[variable] : match;
+
+});
+
+}
+
+  
+
+async generateFromTemplate(templateName, variables, model = "gpt-4o-2024-11-20") {
+
+const prompt = this.fillTemplate(templateName, variables);
+
+const client = new OpenAI();
+
+const response = await client.responses.create({
+
+model: model,
+
+input: prompt
+
+});
+
+return response.output_text;
+
+}
+
+}
+
+```
+
+#### Structured Output Implementation
+
+##### Basic Setup  
+
+```javascript
+
+import OpenAI from "openai";
+
+  
+
+const openai = new OpenAI();
+
+  
+
+async function extractEventData(text) {
+
+const response = await openai.responses.create({
+
+model: "gpt-4o-2024-11-20",
+
+input: [
+
+{
+
+role: "system",
+
+content: "Extract structured event information from the text."
+
+},
+
+{
+
+role: "user",
+
+content: text
+
+}
+
+],
+
+text: {
+
+format: {
+
+type: "json_schema",
+
+name: "calendar_event",
+
+schema: {
+
+type: "object",
+
+properties: {
+
+name: { type: "string" },
+
+date: { type: "string" },
+
+participants: {
+
+type: "array",
+
+items: { type: "string" }
+
+}
+
+},
+
+required: ["name", "date", "participants"],
+
+additionalProperties: false
+
+},
+
+strict: true
+
+}
+
+}
+
+});
+
+return JSON.parse(response.output_text);
+
+}
+
+```
+
+##### Robust Error Handling
+
+```javascript
+
+async function extractDataWithErrorHandling(text) {
+
+try {
+
+const response = await openai.responses.create({
+
+model: "gpt-4o-2024-11-20", // Updated from 2024-08-06
+
+input: [
+
+{
+
+role: "system",
+
+content: "Extract structured data from the text."
+
+},
+
+{
+
+role: "user",
+
+content: text
+
+}
+
+],
+
+text: {
+
+format: {
+
+type: "json_schema",
+
+name: "extracted_data",
+
+schema: {
+
+type: "object",
+
+properties: {
+
+// Schema properties here
+
+},
+
+required: ["field1", "field2"],
+
+additionalProperties: false
+
+},
+
+strict: true
+
+}
+
+}
+
+});
+
+  
+
+// Check for refusals
+
+if (response.output[0].content.some(content => content.type === "refusal")) {
+
+const refusalContent = response.output[0].content.find(content =>
+
+content.type === "refusal"
+
+).refusal;
+
+console.log("Model refused to generate response:", refusalContent);
+
+return { error: "REFUSAL", message: refusalContent };
+
+}
+
+  
+
+// Check for incomplete responses
+
+if (response.status === "incomplete") {
+
+const reason = response.incomplete_details.reason;
+
+if (reason === "max_output_tokens") {
+
+return { error: "TRUNCATED", message: "Response exceeded maximum length" };
+
+} else if (reason === "content_filter") {
+
+return { error: "FILTERED", message: "Content was filtered" };
+
+}
+
+return { error: "INCOMPLETE", message: `Response incomplete: ${reason}` };
+
+}
+
+  
+
+// Parse and return successful response
+
+return JSON.parse(response.output_text);
+
+} catch (error) {
+
+console.error("API error:", error);
+
+return { error: "API_ERROR", message: error.message };
+
+}
+
+}
+
+```
 ### Frontend Rules
 
 Follow these rules when working on the frontend.
@@ -296,7 +1084,9 @@ And adding it to the schema in `db/db.ts`:
 ```ts
 import { todosTable } from "@/db/schema"
 
-const schema = { todos: todosTable }
+const schema = {
+  todos: todosTable
+}
 ```
 
 And a more complex schema:
@@ -359,7 +1149,10 @@ And adding it to the schema in `db/db.ts`:
 ```ts
 import { chatsTable, messagesTable } from "@/db/schema"
 
-const schema = { chats: chatsTable, messages: messagesTable }
+const schema = {
+  chats: chatsTable,
+  messages: messagesTable
+}
 ```
 
 #### Server Actions
@@ -465,179 +1258,3 @@ export async function deleteTodoAction(id: string): Promise<ActionState<void>> {
   }
 }
 ```
-
-### Auth Rules
-
-Follow these rules when working on auth.
-
-It uses Clerk for authentication.
-
-#### General Rules
-
-- Import the auth helper with `import { auth } from "@clerk/nextjs/server"` in server components
-- await the auth helper in server actions
-
-### Payments Rules
-
-Follow these rules when working on payments.
-
-It uses Stripe for payments.
-
-# Storage Rules
-
-Follow these rules when working with Supabase Storage.
-
-It uses Supabase Storage for file uploads, downloads, and management.
-
-## General Rules
-
-- Always use environment variables for bucket names to maintain consistency across environments
-- Never hardcode bucket names in the application code
-- Always handle file size limits and allowed file types at the application level
-- Use the `upsert` method instead of `upload` when you want to replace existing files
-- Always implement proper error handling for storage operations
-- Use content-type headers when uploading files to ensure proper file handling
-
-## Organization
-
-### Buckets
-
-- Name buckets in kebab-case: `user-uploads`, `profile-images`
-- Create separate buckets for different types of files (e.g., `profile-images`, `documents`, `attachments`)
-- Document bucket purposes in a central location
-- Set appropriate bucket policies (public/private) based on access requirements
-- Implement RLS (Row Level Security) policies for buckets that need user-specific access
-- Make sure to let me know instructions for setting up RLS policies on Supabase since you can't do this yourself, including the SQL scripts I need to run in the editor
-
-### File Structure
-
-- Organize files in folders based on their purpose and ownership
-- Use predictable, collision-resistant naming patterns
-- Structure: `{bucket}/{userId}/{purpose}/{filename}`
-- Example: `profile-images/123e4567-e89b/avatar/profile.jpg`
-- Include timestamps in filenames when version history is important
-- Example: `documents/123e4567-e89b/contracts/2024-02-13-contract.pdf`
-
-## Actions
-
-- When importing storage actions, use `@/actions/storage`
-- Name files like `example-storage-actions.ts`
-- Include Storage at the end of function names `Ex: uploadFile -> uploadFileStorage`
-- Follow the same ActionState pattern as DB actions
-
-Example of a storage action:
-
-```ts
-"use server"
-
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
-import { ActionState } from "@/types"
-
-export async function uploadFileStorage(
-  bucket: string,
-  path: string,
-  file: File
-): Promise<ActionState<{ path: string }>> {
-  try {
-    const supabase = createClientComponentClient()
-
-    const { data, error } = await supabase.storage
-      .from(bucket)
-      .upload(path, file, {
-        upsert: false,
-        contentType: file.type
-      })
-
-    if (error) throw error
-
-    return {
-      isSuccess: true,
-      message: "File uploaded successfully",
-      data: { path: data.path }
-    }
-  } catch (error) {
-    console.error("Error uploading file:", error)
-    return { isSuccess: false, message: "Failed to upload file" }
-  }
-}
-```
-
-## File Handling
-
-### Upload Rules
-
-- Always validate file size before upload
-- Implement file type validation using both extension and MIME type
-- Generate unique filenames to prevent collisions
-- Set appropriate content-type headers
-- Handle existing files appropriately (error or upsert)
-
-Example validation:
-
-```ts
-const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
-const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"]
-
-function validateFile(file: File): boolean {
-  if (file.size > MAX_FILE_SIZE) {
-    throw new Error("File size exceeds limit")
-  }
-
-  if (!ALLOWED_TYPES.includes(file.type)) {
-    throw new Error("File type not allowed")
-  }
-
-  return true
-}
-```
-
-### Download Rules
-
-- Always handle missing files gracefully
-- Implement proper error handling for failed downloads
-- Use signed URLs for private files
-
-### Delete Rules
-
-- Implement soft deletes when appropriate
-- Clean up related database records when deleting files
-- Handle bulk deletions carefully
-- Verify ownership before deletion
-- Always delete all versions/transforms of a file
-
-## Security
-
-### Bucket Policies
-
-- Make buckets private by default
-- Only make buckets public when absolutely necessary
-- Use RLS policies to restrict access to authorized users
-- Example RLS policy:
-
-```sql
-CREATE POLICY "Users can only access their own files"
-ON storage.objects
-FOR ALL
-USING (auth.uid()::text = (storage.foldername(name))[1]);
-```
-
-### Access Control
-
-- Generate short-lived signed URLs for private files
-- Implement proper CORS policies
-- Use separate buckets for public and private files
-- Never expose internal file paths
-- Validate user permissions before any operation
-
-## Error Handling
-
-- Implement specific error types for common storage issues
-- Always provide meaningful error messages
-- Implement retry logic for transient failures
-- Log storage errors separately for monitoring
-
-## Optimization
-
-- Implement progressive upload for large files
-- Clean up temporary files and failed uploads
-- Use batch operations when handling multiple files
