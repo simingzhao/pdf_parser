@@ -1,14 +1,23 @@
 /*
-Contains middleware for the application.
-No authentication is required for the MVP.
+Clerk authentication middleware configuration.
 */
 
-import { NextResponse } from "next/server"
+import { authMiddleware } from "@clerk/nextjs"
 
-export default function middleware(req: Request) {
-  return NextResponse.next()
-}
+// Paths that don't require authentication
+export default authMiddleware({
+  publicRoutes: [
+    "/",
+    "/login(.*)",
+    "/signup(.*)",
+    "/about",
+    "/features",
+    "/pricing",
+    "/contact",
+    "/api/webhooks(.*)"
+  ]
+})
 
 export const config = {
-  matcher: []
+  matcher: ["/((?!.+\\.[\\w]+$|_next).*)", "/", "/(api|trpc)(.*)"]
 }

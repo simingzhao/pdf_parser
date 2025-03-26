@@ -18,6 +18,8 @@
     "prepare": "husky install"
   },
   "dependencies": {
+    "@clerk/nextjs": "^6.12.11",
+    "@clerk/themes": "^2.2.25",
     "@hookform/resolvers": "^4.0.0",
     "@radix-ui/react-accordion": "^1.2.3",
     "@radix-ui/react-alert-dialog": "^1.1.6",
@@ -74,6 +76,7 @@
     "recharts": "^2.15.1",
     "sonner": "^1.7.4",
     "stripe": "^17.6.0",
+    "svix": "^1.62.0",
     "tailwind-merge": "^3.0.1",
     "tailwindcss": "^3.4.17",
     "tailwindcss-animate": "^1.0.7",
