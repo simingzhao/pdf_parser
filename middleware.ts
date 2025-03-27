@@ -1,12 +1,25 @@
 /*
-Clerk authentication middleware configuration.
+Authentication middleware temporarily disabled.
+Will be implemented later.
+
+Original Clerk authentication configuration:
+import { authMiddleware } from "@clerk/nextjs/server";
+
+export default authMiddleware({
+  publicRoutes: [
+    "/",
+    "/api/webhooks(.*)",
+    "/api/parse-pdf",
+    "/api/extract-data", 
+    "/api/stripe/webhooks",
+    "/login(.*)",
+    "/signup(.*)",
+    "/results(.*)"
+  ]
+});
 */
 
-import { clerkMiddleware } from "@clerk/nextjs/server"
-
-// Paths that don't require authentication
-export default clerkMiddleware()
-
+// No authentication middleware - all routes are accessible
 export const config = {
-  matcher: ["/((?!.+\\.[\\w]+$|_next).*)", "/", "/(api|trpc)(.*)"]
-}
+  matcher: [] // Empty matcher means no routes are processed by middleware
+};
